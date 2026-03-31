@@ -127,6 +127,7 @@
     polygonSeries.mapPolygons.template.setAll({
       toggleKey: "active",
       interactive: true,
+      cursorOverStyle: "pointer",
       fill: am5.color(0xd9d9d9),
       stroke: am5.color(0xffffff),
       strokeWidth: 0.75,
@@ -142,8 +143,10 @@
       paddingTop: 0,
       paddingBottom: 0,
       paddingLeft: 0,
-      paddingRight: 0
+      paddingRight: 0,
+      keepTargetHover: false
     });
+    tooltip.set("hideDelay", 1500);
     tooltip.get("background").setAll({
       fill: am5.color(0xffffff),
       fillOpacity: 0,

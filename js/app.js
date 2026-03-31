@@ -134,41 +134,51 @@
       strokeOpacity: 1
     });
 
-    // Premium HTML tooltip with flag image
-    var tooltip = am5.Tooltip.new(root, {
-      getFillFromSprite: false,
-      getLabelFillFromSprite: false,
-      autoTextColor: false,
-      labelHTML: "",
-      paddingTop: 0,
-      paddingBottom: 0,
-      paddingLeft: 0,
-      paddingRight: 0
-    });
-    tooltip.get("background").setAll({
-      fill: am5.color(0xffffff),
-      fillOpacity: 0,
-      strokeWidth: 0
-    });
-    polygonSeries.mapPolygons.template.set("tooltip", tooltip);
+    // ── Premium custom tooltip (DOM-based, no auto-hide) ──
+    var customTooltipEl = document.createElement('div');
+    customTooltipEl.id = 'custom-globe-tooltip';
+    customTooltipEl.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.18s ease,transform 0.18s ease;transform:translateY(6px)';
+    document.body.appendChild(customTooltipEl);
 
-    polygonSeries.mapPolygons.template.adapters.add("tooltipHTML", function(html, target) {
-      if (target.dataItem) {
-        var mapName = target.dataItem.dataContext.name;
-        var cd = COUNTRIES_DATA[mapName];
-        if (cd) {
-          var flagSrc = encodeURI(getFlagPath(cd.flag));
-          var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
-          return '<div style="background:rgba(255,255,255,0.97);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.10);padding:14px 18px 12px;text-align:center;min-width:140px;backdrop-filter:blur(8px);border:1px solid rgba(0,0,0,0.06)">' +
-            '<img src="' + flagSrc + '" style="width:80px;height:auto;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,0.15);margin:0 auto 10px;display:block;border:1px solid rgba(0,0,0,0.08)" />' +
-            '<div style="font-size:14px;font-weight:700;color:#1a1a1a;letter-spacing:-0.01em;margin-bottom:4px">' + (cd.display || mapName) + '</div>' +
-            '<div style="font-size:11px;font-weight:500;color:#fff;background:#800000;display:inline-block;padding:2px 10px;border-radius:10px;letter-spacing:0.03em">' + contName + '</div>' +
-            '</div>';
-        }
-        return '<div style="background:rgba(255,255,255,0.97);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.15);padding:10px 16px;text-align:center;backdrop-filter:blur(8px)">' +
-          '<div style="font-size:13px;font-weight:600;color:#1a1a1a">' + mapName + '</div></div>';
+    var tooltipVisible = false;
+
+    polygonSeries.mapPolygons.template.events.on("pointerover", function(ev) {
+      var target = ev.target;
+      if (!target.dataItem) return;
+      var mapName = target.dataItem.dataContext.name;
+      var cd = COUNTRIES_DATA[mapName];
+      if (cd) {
+        var flagSrc = encodeURI(getFlagPath(cd.flag));
+        var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
+        customTooltipEl.innerHTML =
+          '<div style="background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,0.22),0 4px 16px rgba(0,0,0,0.12);padding:20px 24px 16px;text-align:center;min-width:200px;border:1px solid rgba(0,0,0,0.06)">' +
+            '<img src="' + flagSrc + '" style="width:130px;height:auto;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.18);margin:0 auto 14px;display:block;border:2px solid rgba(0,0,0,0.08)" />' +
+            '<div style="font-size:18px;font-weight:800;color:#111;letter-spacing:-0.02em;margin-bottom:6px;font-family:Inter,system-ui,sans-serif">' + (cd.display || mapName) + '</div>' +
+            '<div style="font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#800000,#a52a2a);display:inline-block;padding:4px 14px;border-radius:12px;letter-spacing:0.04em;text-transform:uppercase">' + contName + '</div>' +
+          '</div>';
+      } else {
+        customTooltipEl.innerHTML =
+          '<div style="background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.18);padding:14px 20px;text-align:center">' +
+            '<div style="font-size:16px;font-weight:700;color:#111">' + mapName + '</div></div>';
       }
-      return "";
+      tooltipVisible = true;
+      customTooltipEl.style.opacity = '1';
+      customTooltipEl.style.transform = 'translateY(0)';
+    });
+
+    polygonSeries.mapPolygons.template.events.on("pointerout", function() {
+      tooltipVisible = false;
+      customTooltipEl.style.opacity = '0';
+      customTooltipEl.style.transform = 'translateY(6px)';
+    });
+
+    polygonSeries.mapPolygons.template.events.on("globalpointermove", function(ev) {
+      if (tooltipVisible) {
+        var x = ev.point.x;
+        var y = ev.point.y;
+        customTooltipEl.style.left = (x + 16) + 'px';
+        customTooltipEl.style.top = (y - 20) + 'px';
+      }
     });
 
     polygonSeries.mapPolygons.template.states.create("hover", {

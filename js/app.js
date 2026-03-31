@@ -143,10 +143,8 @@
       paddingTop: 0,
       paddingBottom: 0,
       paddingLeft: 0,
-      paddingRight: 0,
-      keepTargetHover: false
+      paddingRight: 0
     });
-    tooltip.set("hideDelay", 1500);
     tooltip.get("background").setAll({
       fill: am5.color(0xffffff),
       fillOpacity: 0,

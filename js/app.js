@@ -1,887 +1,549 @@
 /* ============================================================
-   3D FLAG EXPLORER — Premium D3.js Map Engine
-   Natural Earth projection · Rich gradients · Multi-atmosphere
-   RAF tooltip · Throttled sidebar · Zero DOM reordering
+   3D FLAG EXPLORER — amCharts 5 Rotating Globe
+   Orthographic projection · Continent rotation · Globe/Map toggle
    ============================================================ */
 
 (function () {
   'use strict';
 
-  /* ── State ─────────────────────────────────────────────── */
-  var svg, mapG, pathGen, proj, zoomB, meshData, hlOverlay;
-  var allFeatures = [], countryList = [];
-  var activeContinent = 'world', activeLetter = 'all';
-  var activeNode = null, hoveredNode = null, searchTimer = null;
-  var W, H;
-
-  /* Performance: RAF-throttled tooltip positioning */
-  var tipRAF = 0, tipX = 0, tipY = 0;
-  var lastHoveredFeature = null;  /* track to skip redundant updates */
-  var tipVisible = false;         /* true state for tooltip */
-  var leaveTimer = null;          /* debounce hover-leave for gap crossings */
-
-  var q = function (s) { return document.querySelector(s); };
-  var qa = function (s) { return [].slice.call(document.querySelectorAll(s)); };
-
+  // DOM references
   var el = {};
   function cacheDom() {
-    el.loader       = q('#loader');
-    el.app          = q('#app');
-    el.mapDiv       = q('#map-container');
-    el.tip          = q('#map-tooltip');
-    el.tipFlag      = q('#tooltip-flag');
-    el.tipName      = q('#tooltip-name');
-    el.tipCont      = q('#tooltip-cont');
-    el.search       = q('#search-input');
-    el.searchDrop   = q('#search-results');
-    el.countryList  = q('#country-list');
-    el.alphaBar     = q('#alphabet-filter');
-    el.countNum     = q('#country-count-num');
-    el.sidebarCount = q('#sidebar-count');
-    el.panel        = q('#flag-panel');
-    el.panelBg      = q('#flag-panel-backdrop');
-    el.panelClose   = q('#flag-panel-close');
-    el.panelImg     = q('#flag-image');
-    el.panelName    = q('#flag-country-name');
-    el.panelBadge   = q('#flag-continent-badge');
-    el.neighbors    = q('#neighbor-flags');
-    el.neighborsWrap= q('#flag-neighbors');
-    el.sidebar      = q('#sidebar');
-    el.sideToggle   = q('#sidebar-toggle');
-    el.sideReopen   = q('#sidebar-reopen');
-    el.reset        = q('#reset-btn');
-    el.zoomIn       = q('#zoom-in');
-    el.zoomOut      = q('#zoom-out');
-    el.zoomSlider   = q('#zoom-slider');
-    el.zoomLevel    = q('#map-zoom-level');
+    el.search       = document.getElementById('search-input');
+    el.searchDrop   = document.getElementById('search-results');
+    el.countryList  = document.getElementById('country-list');
+    el.countNum     = document.getElementById('country-count-num');
+    el.sidebarCount = document.getElementById('sidebar-count');
+    el.panel        = document.getElementById('flag-panel');
+    el.panelClose   = document.getElementById('flag-panel-close');
+    el.panelImg     = document.getElementById('flag-image');
+    el.panelName    = document.getElementById('flag-country-name');
+    el.panelBadge   = document.getElementById('flag-continent-badge');
+    el.neighbors    = document.getElementById('neighbor-flags');
+    el.contFilter   = document.getElementById('continent-filter');
   }
 
-  /* ── TopoJSON numeric ID → country name ────────────────── */
-  var ID_MAP = {
-    '004':'Afghanistan','008':'Albania','012':'Algeria','024':'Angola',
-    '010':'Antarctica','032':'Argentina','051':'Armenia','036':'Australia',
-    '040':'Austria','031':'Azerbaijan','044':'Bahamas','050':'Bangladesh',
-    '112':'Belarus','056':'Belgium','084':'Belize','204':'Benin',
-    '064':'Bhutan','068':'Bolivia','070':'Bosnia and Herz.','072':'Botswana',
-    '076':'Brazil','096':'Brunei','100':'Bulgaria','854':'Burkina Faso',
-    '108':'Burundi','116':'Cambodia','120':'Cameroon','124':'Canada',
-    '140':'Central African Rep.','148':'Chad','152':'Chile','156':'China',
-    '170':'Colombia','178':'Congo','180':'Dem. Rep. Congo','188':'Costa Rica',
-    '384':"Côte d'Ivoire",'191':'Croatia','192':'Cuba','196':'Cyprus',
-    '203':'Czechia','208':'Denmark','262':'Djibouti','214':'Dominican Rep.',
-    '218':'Ecuador','818':'Egypt','222':'El Salvador','226':'Eq. Guinea',
-    '232':'Eritrea','233':'Estonia','748':'eSwatini','231':'Ethiopia',
-    '238':'Falkland Is.','242':'Fiji','246':'Finland','250':'France',
-    '260':'Fr. S. Antarctic Lands','266':'Gabon','270':'Gambia','268':'Georgia',
-    '276':'Germany','288':'Ghana','300':'Greece','304':'Greenland',
-    '320':'Guatemala','324':'Guinea','624':'Guinea-Bissau','328':'Guyana',
-    '332':'Haiti','340':'Honduras','348':'Hungary','352':'Iceland',
-    '356':'India','360':'Indonesia','364':'Iran','368':'Iraq',
-    '372':'Ireland','376':'Israel','380':'Italy','388':'Jamaica',
-    '392':'Japan','400':'Jordan','398':'Kazakhstan','404':'Kenya',
-    '408':'North Korea','410':'South Korea','-99':'Kosovo',
-    '414':'Kuwait','417':'Kyrgyzstan','418':'Laos','428':'Latvia',
-    '422':'Lebanon','426':'Lesotho','430':'Liberia','434':'Libya',
-    '440':'Lithuania','442':'Luxembourg','450':'Madagascar','454':'Malawi',
-    '458':'Malaysia','466':'Mali','478':'Mauritania','484':'Mexico',
-    '498':'Moldova','496':'Mongolia','499':'Montenegro','504':'Morocco',
-    '508':'Mozambique','104':'Myanmar','516':'Namibia','524':'Nepal',
-    '528':'Netherlands','540':'New Caledonia','554':'New Zealand',
-    '558':'Nicaragua','562':'Niger','566':'Nigeria','807':'North Macedonia',
-    '578':'Norway','512':'Oman','586':'Pakistan','275':'Palestine',
-    '591':'Panama','598':'Papua New Guinea','600':'Paraguay','604':'Peru',
-    '608':'Philippines','616':'Poland','620':'Portugal','630':'Puerto Rico',
-    '634':'Qatar','642':'Romania','643':'Russia','646':'Rwanda',
-    '682':'Saudi Arabia','686':'Senegal','688':'Serbia','694':'Sierra Leone',
-    '703':'Slovakia','705':'Slovenia','090':'Solomon Is.','706':'Somalia',
-    '710':'South Africa','728':'S. Sudan','724':'Spain','144':'Sri Lanka',
-    '729':'Sudan','740':'Suriname','752':'Sweden','756':'Switzerland',
-    '760':'Syria','158':'Taiwan','762':'Tajikistan','834':'Tanzania',
-    '764':'Thailand','626':'Timor-Leste','768':'Togo','780':'Trinidad and Tobago',
-    '788':'Tunisia','792':'Turkey','795':'Turkmenistan','800':'Uganda',
-    '804':'Ukraine','784':'United Arab Emirates','826':'United Kingdom',
-    '840':'United States of America','858':'Uruguay','860':'Uzbekistan',
-    '548':'Vanuatu','862':'Venezuela','704':'Vietnam',
-    '732':'W. Sahara','887':'Yemen','894':'Zambia','716':'Zimbabwe'
+  var fullList = [];
+  var activeContinent = 'all';
+  var activeCountry = null;
+
+  // Continent center coordinates for globe rotation
+  var CONTINENT_CENTERS = {
+    africa:       { lon: 20,   lat: 5    },
+    asia:         { lon: 90,   lat: 35   },
+    europe:       { lon: 15,   lat: 50   },
+    northamerica: { lon: -100, lat: 40   },
+    southamerica: { lon: -60,  lat: -15  },
+    oceania:      { lon: 140,  lat: -25  }
   };
 
-  /* ── Boot ───────────────────────────────────────────────── */
-  async function boot() {
+  function init() {
     cacheDom();
-    try {
-      var res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json');
-      var topo = await res.json();
-      var geo = topojson.feature(topo, topo.objects.countries);
-      meshData = topojson.mesh(topo, topo.objects.countries, function (a, b) { return a !== b; });
-      enrichFeatures(geo.features);
-      allFeatures = geo.features;
-      countryList = buildFullCountryList();
-
-      el.app.style.visibility = 'hidden';
-      el.app.classList.remove('hidden');
-
-      createMap();
-      buildAlphabet();
-      renderList();
-      wireSearch();
-      wireContinents();
-      wirePanel();
-      wireSidebar();
-      wireZoom();
-      wireKeys();
-
-      el.countNum.textContent = countryList.length;
-      el.sidebarCount.textContent = countryList.length;
-
-      el.app.classList.add('hidden');
-      el.app.style.visibility = '';
-
-      setTimeout(function () {
-        el.loader.classList.add('hidden');
-        el.app.classList.remove('hidden');
-      }, 800);
-    } catch (err) {
-      console.error('Boot error:', err);
-      el.loader.querySelector('.loader-title').textContent = 'Load Error';
-      el.loader.querySelector('.loader-sub').textContent = 'Check connection and reload.';
-    }
+    fullList = buildFullCountryList();
+    el.countNum.textContent = fullList.length;
+    initGlobe();
+    renderSidebar();
+    bindEvents();
   }
 
-  function enrichFeatures(features) {
-    features.forEach(function (f) {
-      var id = String(f.id);
-      var tryName = (f.properties && f.properties.name) || ID_MAP[id] || ID_MAP[id.padStart(3, '0')];
-      if (!f.properties) f.properties = {};
-      if (tryName) f.properties.name = tryName;
-      f.properties._cd = tryName ? COUNTRIES_DATA[tryName] : null;
+  // ── amCharts 5 Globe ──
+  var root, chart, polygonSeries, backgroundSeries;
+  var previousPolygon;
+
+  function initGlobe() {
+    root = am5.Root.new("chartdiv");
+
+    // Custom theme with maroon red accent
+    var myTheme = am5.Theme.new(root);
+    myTheme.rule("InterfaceColors").setAll({
+      primaryButton: am5.color(0x800000),
+      primaryButtonHover: am5.Color.lighten(am5.color(0x800000), 0.2),
+      primaryButtonDown: am5.Color.lighten(am5.color(0x800000), -0.2),
+      primaryButtonActive: am5.color(0xd9cec8),
+    });
+
+    root.setThemes([am5themes_Animated.new(root), myTheme]);
+
+    chart = root.container.children.push(
+      am5map.MapChart.new(root, {
+        panX: "rotateX",
+        panY: "rotateY",
+        projection: am5map.geoOrthographic(),
+        paddingBottom: 20,
+        paddingTop: 20,
+        paddingLeft: 20,
+        paddingRight: 20
+      })
+    );
+
+    // Globe/Map toggle switch
+    var cont = chart.children.push(am5.Container.new(root, {
+      layout: root.horizontalLayout,
+      x: 20,
+      y: 40
+    }));
+
+    cont.children.push(am5.Label.new(root, {
+      centerY: am5.p50,
+      text: "Globe"
+    }));
+
+    var switchButton = cont.children.push(am5.Button.new(root, {
+      themeTags: ["switch"],
+      centerY: am5.p50,
+      icon: am5.Circle.new(root, {
+        themeTags: ["icon"]
+      })
+    }));
+
+    switchButton.on("active", function () {
+      if (switchButton.get("active")) {
+        chart.set("projection", am5map.geoMercator());
+        chart.set("panY", "translateY");
+        chart.animate({ key: "rotationY", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+        chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 0);
+      } else {
+        chart.set("projection", am5map.geoOrthographic());
+        chart.set("panY", "rotateY");
+        chart.animate({ key: "rotationY", to: -25, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+        chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 0.1);
+      }
+    });
+
+    cont.children.push(am5.Label.new(root, {
+      centerY: am5.p50,
+      text: "Map"
+    }));
+
+    // Country polygons
+    polygonSeries = chart.series.push(
+      am5map.MapPolygonSeries.new(root, {
+        geoJSON: am5geodata_worldLow
+      })
+    );
+
+    polygonSeries.mapPolygons.template.setAll({
+      toggleKey: "active",
+      interactive: true,
+      fill: am5.color(0xd9d9d9),
+      stroke: am5.color(0xffffff),
+      strokeWidth: 0.75,
+      strokeOpacity: 1
+    });
+
+    // Premium HTML tooltip with flag image
+    var tooltip = am5.Tooltip.new(root, {
+      getFillFromSprite: false,
+      getLabelFillFromSprite: false,
+      autoTextColor: false,
+      labelHTML: "",
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      paddingRight: 0
+    });
+    tooltip.get("background").setAll({
+      fill: am5.color(0xffffff),
+      fillOpacity: 0,
+      strokeWidth: 0
+    });
+    polygonSeries.mapPolygons.template.set("tooltip", tooltip);
+
+    polygonSeries.mapPolygons.template.adapters.add("tooltipHTML", function(html, target) {
+      if (target.dataItem) {
+        var mapName = target.dataItem.dataContext.name;
+        var cd = COUNTRIES_DATA[mapName];
+        if (cd) {
+          var flagSrc = encodeURI(getFlagPath(cd.flag));
+          var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
+          return '<div style="background:rgba(255,255,255,0.97);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.10);padding:14px 18px 12px;text-align:center;min-width:140px;backdrop-filter:blur(8px);border:1px solid rgba(0,0,0,0.06)">' +
+            '<img src="' + flagSrc + '" style="width:80px;height:auto;border-radius:6px;box-shadow:0 3px 12px rgba(0,0,0,0.15);margin:0 auto 10px;display:block;border:1px solid rgba(0,0,0,0.08)" />' +
+            '<div style="font-size:14px;font-weight:700;color:#1a1a1a;letter-spacing:-0.01em;margin-bottom:4px">' + (cd.display || mapName) + '</div>' +
+            '<div style="font-size:11px;font-weight:500;color:#fff;background:#800000;display:inline-block;padding:2px 10px;border-radius:10px;letter-spacing:0.03em">' + contName + '</div>' +
+            '</div>';
+        }
+        return '<div style="background:rgba(255,255,255,0.97);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.15);padding:10px 16px;text-align:center;backdrop-filter:blur(8px)">' +
+          '<div style="font-size:13px;font-weight:600;color:#1a1a1a">' + mapName + '</div></div>';
+      }
+      return "";
+    });
+
+    polygonSeries.mapPolygons.template.states.create("hover", {
+      fill: am5.color(0x800000)
+    });
+
+    polygonSeries.mapPolygons.template.states.create("active", {
+      fill: am5.color(0x800000)
+    });
+
+    // Background fill (ocean)
+    backgroundSeries = chart.series.push(
+      am5map.MapPolygonSeries.new(root, {})
+    );
+    backgroundSeries.mapPolygons.template.setAll({
+      fill: root.interfaceColors.get("alternativeBackground"),
+      fillOpacity: 0.1,
+      strokeOpacity: 0
+    });
+    backgroundSeries.data.push({
+      geometry: am5map.getGeoRectangle(90, 180, -90, -180)
+    });
+
+    // Graticule
+    var graticuleSeries = chart.series.unshift(
+      am5map.GraticuleSeries.new(root, {
+        step: 10
+      })
+    );
+    graticuleSeries.mapLines.template.set("strokeOpacity", 0.1);
+
+    // Active state event — rotate globe + show flag panel (for direct map clicks)
+    polygonSeries.mapPolygons.template.on("active", function (active, target) {
+      if (previousPolygon && previousPolygon !== target) {
+        previousPolygon.set("active", false);
+        previousPolygon.set("fill", am5.color(0xd9d9d9));
+      }
+      if (target.get("active")) {
+        // Clear continent highlighting so selected country stands out
+        clearContinentHighlight();
+        target.set("fill", am5.color(0x800000));
+
+        var id = target.dataItem.get("id");
+        selectCountry(id);
+        var mapName = target.dataItem.dataContext.name;
+        var displayName = mapName;
+        if (COUNTRIES_DATA[mapName] && COUNTRIES_DATA[mapName].display) {
+          displayName = COUNTRIES_DATA[mapName].display;
+        }
+        showFlagPanel(mapName);
+        highlightSidebarItem(displayName);
+      } else {
+        target.set("fill", am5.color(0xd9d9d9));
+      }
+      previousPolygon = target;
+    });
+
+    chart.appear(1000, 100);
+    chart.animate({ key: "rotationY", to: -25, duration: 2500, easing: am5.ease.inOut(am5.ease.cubic) });
+  }
+
+  // Rotate globe to a continent center
+  function rotateToContinentCenter(continentKey) {
+    var center = CONTINENT_CENTERS[continentKey];
+    if (!center) return;
+    chart.animate({ key: "rotationX", to: -center.lon, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+    chart.animate({ key: "rotationY", to: -center.lat, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+  }
+
+  // Build a set of map names belonging to a continent
+  function getContinentCountryNames(continentKey) {
+    var names = {};
+    for (var key in COUNTRIES_DATA) {
+      var c = COUNTRIES_DATA[key].continent;
+      if (c === continentKey || (continentKey === 'northamerica' && (c === 'northamerica' || c === 'southamerica'))) {
+        names[key] = true;
+      }
+    }
+    return names;
+  }
+
+  // Highlight all countries in a continent on the map
+  function highlightContinentOnMap(continentKey) {
+    var names = getContinentCountryNames(continentKey);
+    polygonSeries.mapPolygons.each(function (polygon) {
+      if (polygon.dataItem) {
+        var mapName = polygon.dataItem.dataContext.name;
+        if (names[mapName]) {
+          polygon.set("fill", am5.color(0x800000));
+        } else {
+          polygon.set("fill", am5.color(0xd9d9d9));
+        }
+      }
     });
   }
 
-  /* ── Create Map ────────────────────────────────────────── */
-  function createMap() {
-    var rect = el.mapDiv.getBoundingClientRect();
-    W = rect.width;
-    H = rect.height;
-
-    proj = d3.geoNaturalEarth1().fitSize([W, H], { type: 'Sphere' });
-    pathGen = d3.geoPath(proj);
-
-    svg = d3.select(el.mapDiv).append('svg')
-      .attr('class', 'map-svg')
-      .attr('viewBox', '0 0 ' + W + ' ' + H)
-      .attr('preserveAspectRatio', 'xMidYMid meet');
-
-    buildDefs(svg);
-
-    mapG = svg.append('g').attr('class', 'map-g');
-
-    /* ── Render order (back to front) ── */
-
-    // 1. Ocean sphere
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'sphere')
-      .attr('d', pathGen)
-      .attr('fill', 'url(#ocean-grad)');
-
-    // 2. Inner shadow on sphere for depth
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'sphere-shadow')
-      .attr('d', pathGen)
-      .attr('fill', 'url(#sphere-shadow-grad)');
-
-    // 3. Multi-layer atmosphere (outer → inner)
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'atmo-outer')
-      .attr('d', pathGen);
-
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'atmo-mid')
-      .attr('d', pathGen);
-
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'atmosphere')
-      .attr('d', pathGen);
-
-    // 4. Graticule
-    mapG.append('path')
-      .datum(d3.geoGraticule10())
-      .attr('class', 'graticule')
-      .attr('d', pathGen);
-
-    // 5. Countries
-    var countriesG = mapG.append('g').attr('class', 'countries-g');
-    countriesG.selectAll('.land')
-      .data(allFeatures)
-      .enter().append('path')
-      .attr('class', 'land')
-      .attr('d', pathGen)
-      .on('mouseenter', onHover)
-      .on('mouseleave', onLeave)
-      .on('mousemove', onMove)
-      .on('click', onClick);
-
-    // 6. Border mesh
-    mapG.append('path')
-      .datum(meshData)
-      .attr('class', 'borders')
-      .attr('d', pathGen);
-
-    // 7. Sphere outline ring
-    mapG.append('path')
-      .datum({ type: 'Sphere' })
-      .attr('class', 'sphere-ring')
-      .attr('d', pathGen);
-
-    // 8. Highlight overlay — single reusable path, always on top
-    //    Uses opacity transitions instead of display:none for smoothness
-    hlOverlay = mapG.append('path')
-      .attr('class', 'land hovered')
-      .style('opacity', 0)
-      .style('pointer-events', 'none');
-
-    // Zoom — premium feel with extended range
-    zoomB = d3.zoom()
-      .scaleExtent([1, 12])
-      .on('zoom', onZoomed);
-
-    svg.call(zoomB);
-    svg.on('dblclick.zoom', null);
-
-    window.addEventListener('resize', onResize);
+  // Clear continent highlight — reset all to default
+  function clearContinentHighlight() {
+    polygonSeries.mapPolygons.each(function (polygon) {
+      polygon.set("fill", am5.color(0xd9d9d9));
+    });
   }
 
-  /* ── SVG Definitions — Rich premium gradients ──────────── */
-  function buildDefs(svgEl) {
-    var defs = svgEl.append('defs');
-
-    // Ocean — deep cinematic blue with off-center light source
-    var og = defs.append('radialGradient').attr('id', 'ocean-grad')
-      .attr('cx', '38%').attr('cy', '32%').attr('r', '68%');
-    og.append('stop').attr('offset', '0%').attr('stop-color', '#1e6090');
-    og.append('stop').attr('offset', '18%').attr('stop-color', '#185278');
-    og.append('stop').attr('offset', '40%').attr('stop-color', '#103d5c');
-    og.append('stop').attr('offset', '65%').attr('stop-color', '#092840');
-    og.append('stop').attr('offset', '100%').attr('stop-color', '#040e1c');
-
-    // Sphere inner shadow — deep 3D curvature
-    var sg = defs.append('radialGradient').attr('id', 'sphere-shadow-grad')
-      .attr('cx', '50%').attr('cy', '50%').attr('r', '50%');
-    sg.append('stop').attr('offset', '0%').attr('stop-color', 'transparent');
-    sg.append('stop').attr('offset', '55%').attr('stop-color', 'transparent');
-    sg.append('stop').attr('offset', '80%').attr('stop-color', 'rgba(0,0,0,0.18)');
-    sg.append('stop').attr('offset', '100%').attr('stop-color', 'rgba(0,0,0,0.40)');
-
-    // Country fill — vivid emerald with rich 3D lit shading
-    var lg = defs.append('linearGradient').attr('id', 'land-grad')
-      .attr('x1', '0').attr('y1', '0').attr('x2', '0.15').attr('y2', '1');
-    lg.append('stop').attr('offset', '0%').attr('stop-color', '#4aedb5');
-    lg.append('stop').attr('offset', '15%').attr('stop-color', '#22d89a');
-    lg.append('stop').attr('offset', '40%').attr('stop-color', '#0ebb7c');
-    lg.append('stop').attr('offset', '65%').attr('stop-color', '#069e65');
-    lg.append('stop').attr('offset', '85%').attr('stop-color', '#058050');
-    lg.append('stop').attr('offset', '100%').attr('stop-color', '#056d44');
-
-    // Hover fill — electric crimson with lit depth
-    var hg = defs.append('linearGradient').attr('id', 'hover-grad')
-      .attr('x1', '0').attr('y1', '0').attr('x2', '0.15').attr('y2', '1');
-    hg.append('stop').attr('offset', '0%').attr('stop-color', '#ff5c73');
-    hg.append('stop').attr('offset', '20%').attr('stop-color', '#f43f5e');
-    hg.append('stop').attr('offset', '50%').attr('stop-color', '#dc2626');
-    hg.append('stop').attr('offset', '80%').attr('stop-color', '#b91c1c');
-    hg.append('stop').attr('offset', '100%').attr('stop-color', '#881616');
-
-    // Active fill — intense warm maroon
-    var ag = defs.append('linearGradient').attr('id', 'active-grad')
-      .attr('x1', '0').attr('y1', '0').attr('x2', '0.1').attr('y2', '1');
-    ag.append('stop').attr('offset', '0%').attr('stop-color', '#ef4444');
-    ag.append('stop').attr('offset', '35%').attr('stop-color', '#dc2626');
-    ag.append('stop').attr('offset', '70%').attr('stop-color', '#a31515');
-    ag.append('stop').attr('offset', '100%').attr('stop-color', '#6b0000');
-
-    // Dimmed country fill — dramatically darker for contrast
-    var dg = defs.append('linearGradient').attr('id', 'land-dim-grad')
-      .attr('x1', '0').attr('y1', '0').attr('x2', '0').attr('y2', '1');
-    dg.append('stop').attr('offset', '0%').attr('stop-color', '#14805a');
-    dg.append('stop').attr('offset', '50%').attr('stop-color', '#0a6040');
-    dg.append('stop').attr('offset', '100%').attr('stop-color', '#054030');
+  // Rotate globe to country by amCharts polygon ID
+  function selectCountry(id) {
+    var dataItem = polygonSeries.getDataItemById(id);
+    var target = dataItem.get("mapPolygon");
+    if (target) {
+      var centroid = target.geoCentroid();
+      if (centroid) {
+        chart.animate({ key: "rotationX", to: -centroid.longitude, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+        chart.animate({ key: "rotationY", to: -centroid.latitude, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
+      }
+    }
   }
 
-  /* ── Zoom handler ──────────────────────────────────────── */
-  function onZoomed(event) {
-    mapG.attr('transform', event.transform);
-    var k = event.transform.k;
-    el.zoomSlider.value = k;
-    el.zoomLevel.textContent = k.toFixed(1) + '\u00d7';
-  }
+  // Rotate to country by name (called from sidebar/search)
+  function rotateToCountryByName(name, topoName) {
+    var found = null;
 
-  /* ── Resize ────────────────────────────────────────────── */
-  function onResize() {
-    var r = el.mapDiv.getBoundingClientRect();
-    W = r.width; H = r.height;
-    proj.fitSize([W, H], { type: 'Sphere' });
-    pathGen = d3.geoPath(proj);
-    svg.attr('viewBox', '0 0 ' + W + ' ' + H);
-    mapG.selectAll('.sphere, .sphere-shadow, .atmosphere, .atmo-mid, .atmo-outer, .graticule, .land, .borders, .sphere-ring')
-      .attr('d', function (d) { return d ? pathGen(d) : null; });
-  }
-
-  /* ── Hover — zero-lag country-to-country ────────────── */
-  function onHover(event, d) {
-    if (this === activeNode) return;
-    var node = d3.select(this);
-    if (node.classed('hidden-country')) return;
-    var cd = d.properties._cd;
-    var name = cd ? cd.display : d.properties.name;
-    if (!name) return;
-
-    // Cancel any pending leave — we're still on land
-    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
-
-    var wasHovering = hoveredNode !== null;
-    hoveredNode = this;
-
-    // Update overlay — instant swap, no transitions between countries
-    hlOverlay.interrupt();
-    hlOverlay.datum(d).attr('d', pathGen).style('opacity', 1);
-    if (!wasHovering) {
-      mapG.select('.countries-g').classed('has-hover', true);
+    // First try by topoName (map key) — most reliable
+    if (topoName) {
+      polygonSeries.mapPolygons.each(function (polygon) {
+        if (!found && polygon.dataItem && polygon.dataItem.dataContext.name === topoName) {
+          found = polygon;
+        }
+      });
     }
 
-    // Update tooltip — only change content if different feature
-    if (lastHoveredFeature !== d) {
-      lastHoveredFeature = d;
-      el.tipName.textContent = name;
-      if (cd) {
-        var flagSrc = getFlagPath(cd.flag);
-        if (el.tipFlag.src !== flagSrc) el.tipFlag.src = flagSrc;
-        el.tipFlag.style.display = 'block';
-        el.tipCont.textContent = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : '';
-      } else {
-        el.tipFlag.style.display = 'none';
-        el.tipCont.textContent = '';
+    // Then try by display name directly
+    if (!found) {
+      polygonSeries.mapPolygons.each(function (polygon) {
+        if (!found && polygon.dataItem && polygon.dataItem.dataContext.name === name) {
+          found = polygon;
+        }
+      });
+    }
+
+    // Fall back to alias lookup
+    if (!found) {
+      var aliases = getNameAliases(name);
+      for (var i = 0; i < aliases.length && !found; i++) {
+        var alias = aliases[i];
+        polygonSeries.mapPolygons.each(function (polygon) {
+          if (!found && polygon.dataItem && polygon.dataItem.dataContext.name === alias) {
+            found = polygon;
+          }
+        });
       }
     }
 
-    // Show tooltip instantly
-    if (!tipVisible) {
-      tipVisible = true;
-      el.tip.style.opacity = '1';
-      el.tip.style.transform = 'translate(-50%,calc(-100% - 16px)) scale(1)';
-      el.tip.style.display = 'flex';
+    // Clear any continent highlighting so the selected country is visible
+    clearContinentHighlight();
+
+    if (found) {
+      if (previousPolygon && previousPolygon !== found) {
+        previousPolygon.set("active", false);
+      }
+      previousPolygon = found;
+
+      // Directly select rather than using set("active") to avoid double-handling
+      var id = found.dataItem.get("id");
+      selectCountry(id);
+      found.setAll({ fill: am5.color(0x800000) });
+
+      var mapName = found.dataItem.dataContext.name;
+      showFlagPanel(mapName);
+      highlightSidebarItem(name);
+    } else {
+      showFlagPanel(name);
+      highlightSidebarItem(name);
     }
-
-    // Position via RAF
-    tipX = event.clientX;
-    tipY = event.clientY;
-    scheduleTipUpdate();
-
-    if (cd) hlSidebar(cd.display, true);
   }
 
-  function onLeave(event, d) {
-    if (this === activeNode) return;
-    var node = d3.select(this);
-    if (node.classed('hidden-country')) return;
-    var cd = d.properties._cd;
-    if (cd) hlSidebar(cd.display, false);
-
-    // Debounce leave — prevents flicker when crossing tiny gaps between paths
-    if (leaveTimer) clearTimeout(leaveTimer);
-    leaveTimer = setTimeout(function () {
-      leaveTimer = null;
-      if (hoveredNode) return; // re-entered a country already
-      lastHoveredFeature = null;
-      hlOverlay.interrupt().style('opacity', 0);
-      mapG.select('.countries-g').classed('has-hover', false);
-      tipVisible = false;
-      el.tip.style.opacity = '0';
-      el.tip.style.transform = 'translate(-50%,calc(-100% - 8px)) scale(0.96)';
-    }, 40);
-
-    hoveredNode = null;
+  function getNameAliases(name) {
+    var aliases = [];
+    for (var key in COUNTRIES_DATA) {
+      if (COUNTRIES_DATA[key].display === name) {
+        aliases.push(key);
+      }
+    }
+    return aliases;
   }
 
-  function onMove(event) {
-    tipX = event.clientX;
-    tipY = event.clientY;
-    scheduleTipUpdate();
-  }
-
-  /* RAF-throttled tooltip positioning — eliminates jank */
-  function scheduleTipUpdate() {
-    if (tipRAF) return;
-    tipRAF = requestAnimationFrame(function () {
-      el.tip.style.left = tipX + 'px';
-      el.tip.style.top = tipY + 'px';
-      tipRAF = 0;
-    });
-  }
-
-  /* ── Click ─────────────────────────────────────────────── */
-  function onClick(event, d) {
-    var node = d3.select(this);
-    if (node.classed('hidden-country')) return;
-    var cd = d.properties._cd;
+  // ── Flag Panel ──
+  function showFlagPanel(name) {
+    activeCountry = name;
+    var cd = COUNTRIES_DATA[name];
+    if (!cd) {
+      var extra = EXTRA_FLAGS.find(function (e) { return e.name === name; });
+      if (extra) {
+        cd = { flag: extra.flag, continent: extra.continent, display: name };
+      }
+    }
+    if (!cd) {
+      for (var key in COUNTRIES_DATA) {
+        if (COUNTRIES_DATA[key].display === name) {
+          cd = COUNTRIES_DATA[key];
+          break;
+        }
+      }
+    }
     if (!cd) return;
 
-    if (activeNode && activeNode !== this) {
-      d3.select(activeNode).classed('active', false);
-    }
-    activeNode = this;
-    node.classed('active', true);
-    hlOverlay.interrupt().style('opacity', 0);
-    hoveredNode = null;
-    lastHoveredFeature = null;
-    if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
-    mapG.select('.countries-g').classed('has-hover', false);
-    tipVisible = false;
-    el.tip.style.opacity = '0';
+    el.panelImg.src = getFlagPath(cd.flag);
+    el.panelImg.alt = cd.display || name;
+    el.panelName.textContent = cd.display || name;
 
-    openPanel(cd.display, cd.flag, cd.continent);
+    var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
+    el.panelBadge.textContent = contName;
 
-    // Fly to country bounds
-    var b = pathGen.bounds(d);
-    var bw = b[1][0] - b[0][0], bh = b[1][1] - b[0][1];
-    if (bw < 1 || bh < 1) return;
-    var cx = (b[0][0] + b[1][0]) / 2, cy = (b[0][1] + b[1][1]) / 2;
-    var scale = Math.min(W / bw, H / bh, 10) * 0.65;
-    smoothFlyTo(d3.zoomIdentity.translate(W / 2 - cx * scale, H / 2 - cy * scale).scale(scale));
-  }
-
-  /* ── Continent View ────────────────────────────────────── */
-  function applyView(c) {
-    activeNode = null;
-    hoveredNode = null;
-    lastHoveredFeature = null;
-    hlOverlay.interrupt().style('opacity', 0);
-    mapG.select('.countries-g').classed('has-hover', false);
-    mapG.selectAll('.land')
-      .classed('active', false)
-      .classed('search-hl', false);
-
-    if (c === 'world') {
-      mapG.selectAll('.land').classed('hidden-country', false);
-    } else {
-      mapG.selectAll('.land').each(function (d) {
-        var s = d3.select(this);
-        var cd = d.properties._cd;
-        s.classed('hidden-country', !(cd && cd.continent === c));
+    el.neighbors.innerHTML = '';
+    var sameContinent = fullList.filter(function (c) {
+      return c.continent === cd.continent && c.name !== (cd.display || name);
+    });
+    var shown = sameContinent.slice(0, 9);
+    shown.forEach(function (c) {
+      var div = document.createElement('div');
+      div.className = 'neighbor-item';
+      div.innerHTML = '<img src="' + encodeURI(getFlagPath(c.flag)) + '" alt="' + escapeHtml(c.name) + '">' +
+                      '<span>' + escapeHtml(c.name) + '</span>';
+      div.addEventListener('click', function () {
+        rotateToCountryByName(c.name, c.topoName);
       });
-    }
-  }
-
-  /* ── Smooth fly-to — prevents black blink on zoomed transitions ── */
-  function smoothFlyTo(target, dur) {
-    dur = dur || 800;
-    var cur = d3.zoomTransform(svg.node());
-    if (cur.k > 1.8) {
-      // Already zoomed in — zoom out first to prevent black flash
-      var outDur = Math.round(dur * 0.4);
-      var inDur = dur - outDur;
-      svg.transition().duration(outDur).ease(d3.easeCubicIn)
-        .call(zoomB.transform, d3.zoomIdentity)
-        .transition().duration(inDur).ease(d3.easeCubicOut)
-        .call(zoomB.transform, target);
-    } else {
-      svg.transition().duration(dur).ease(d3.easeCubicInOut)
-        .call(zoomB.transform, target);
-    }
-  }
-
-  function flyToView(c) {
-    if (c === 'world') {
-      smoothFlyTo(d3.zoomIdentity, 800);
-      return;
-    }
-    var cont = CONTINENTS[c];
-    if (!cont || !cont.bounds) return;
-
-    var b0 = cont.bounds[0];
-    var b1 = cont.bounds[1];
-    var corners = [
-      proj([b0[0], b0[1]]),
-      proj([b1[0], b0[1]]),
-      proj([b1[0], b1[1]]),
-      proj([b0[0], b1[1]])
-    ].filter(function (p) { return p !== null; });
-    if (corners.length < 2) return;
-
-    var xs = corners.map(function (p) { return p[0]; });
-    var ys = corners.map(function (p) { return p[1]; });
-    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
-    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-
-    var bw = x1 - x0, bh = y1 - y0;
-    if (bw < 1 || bh < 1) return;
-    var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    var scale = Math.min(W / bw, H / bh) * 0.82;
-    smoothFlyTo(d3.zoomIdentity.translate(W / 2 - cx * scale, H / 2 - cy * scale).scale(scale));
-  }
-
-  function switchContinent(c) {
-    applyView(c);
-    // Stagger zoom so hide/show transitions settle first
-    setTimeout(function () { flyToView(c); }, 80);
-  }
-
-  /* ── Continent Nav ─────────────────────────────────────── */
-  function wireContinents() {
-    qa('.continent-chip').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var c = btn.dataset.continent;
-        if (c === activeContinent) return;
-        qa('.continent-chip').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        activeContinent = c;
-        renderList();
-        switchContinent(c);
-      });
+      el.neighbors.appendChild(div);
     });
-  }
 
-  /* ── Navigate to Country ───────────────────────────────── */
-  function navigateToCountry(c) {
-    openPanel(c.name, c.flag, c.continent);
-    if (!c.isOnMap || !c.topoName) return;
-
-    if (activeContinent !== 'world' && c.continent !== activeContinent) {
-      activeContinent = c.continent;
-      qa('.continent-chip').forEach(function (b) { b.classList.remove('active'); });
-      var chip = q('[data-continent="' + c.continent + '"]');
-      if (chip) chip.classList.add('active');
-      renderList();
-      applyView(c.continent);
-    }
-
-    mapG.selectAll('.land').each(function (d) {
-      if (d.properties.name === c.topoName ||
-          (d.properties._cd && d.properties._cd.display === c.name)) {
-        if (activeNode && activeNode !== this) {
-          d3.select(activeNode).classed('active', false);
-        }
-        activeNode = this;
-        d3.select(this).classed('active', true);
-        hlOverlay.interrupt().style('opacity', 0);
-
-        var b = pathGen.bounds(d);
-        var bw = b[1][0] - b[0][0], bh = b[1][1] - b[0][1];
-        if (bw < 1 || bh < 1) return;
-        var cx = (b[0][0] + b[1][0]) / 2, cy = (b[0][1] + b[1][1]) / 2;
-        var scale = Math.min(W / bw, H / bh, 10) * 0.65;
-        smoothFlyTo(d3.zoomIdentity.translate(W / 2 - cx * scale, H / 2 - cy * scale).scale(scale));
-      }
-    });
-  }
-
-  /* ── Alphabet Filter ───────────────────────────────────── */
-  function buildAlphabet() {
-    var bar = el.alphaBar;
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function (L) {
-      var b = document.createElement('button');
-      b.className = 'alpha-btn';
-      b.dataset.letter = L;
-      b.textContent = L;
-      if (!countryList.some(function (c) { return c.name.toUpperCase().startsWith(L); }))
-        b.classList.add('disabled');
-      b.addEventListener('click', function () {
-        if (b.classList.contains('disabled')) return;
-        qa('.alpha-btn').forEach(function (x) { x.classList.remove('active'); });
-        b.classList.add('active');
-        activeLetter = L;
-        renderList();
-      });
-      bar.appendChild(b);
-    });
-    bar.querySelector('[data-letter="all"]').addEventListener('click', function () {
-      qa('.alpha-btn').forEach(function (x) { x.classList.remove('active'); });
-      bar.querySelector('[data-letter="all"]').classList.add('active');
-      activeLetter = 'all';
-      renderList();
-    });
-  }
-
-  /* ── Sidebar Country List ──────────────────────────────── */
-  function renderList() {
-    var box = el.countryList;
-    box.innerHTML = '';
-    var items = countryList;
-    if (activeContinent !== 'world')
-      items = items.filter(function (c) { return c.continent === activeContinent; });
-    if (activeLetter !== 'all')
-      items = items.filter(function (c) { return c.name.toUpperCase().startsWith(activeLetter); });
-
-    el.sidebarCount.textContent = items.length;
-
-    if (!items.length) {
-      box.innerHTML = '<div class="no-results"><p>No countries found</p></div>';
-      return;
-    }
-    var frag = document.createDocumentFragment();
-    items.forEach(function (c) {
-      var card = document.createElement('div');
-      card.className = 'country-card';
-      card.dataset.name = c.name;
-
-      var img = document.createElement('img');
-      img.className = 'cc-flag';
-      img.src = getFlagPath(c.flag);
-      img.alt = c.name;
-      img.loading = 'lazy';
-
-      var info = document.createElement('div');
-      info.className = 'cc-info';
-      var n = document.createElement('div');
-      n.className = 'cc-name';
-      n.textContent = c.name;
-      var ct = document.createElement('div');
-      ct.className = 'cc-cont';
-      ct.textContent = CONTINENTS[c.continent] ? CONTINENTS[c.continent].name : c.continent;
-      info.appendChild(n);
-      info.appendChild(ct);
-
-      card.appendChild(img);
-      card.appendChild(info);
-      card.addEventListener('click', function () { navigateToCountry(c); });
-      frag.appendChild(card);
-    });
-    box.appendChild(frag);
-  }
-
-  /* Sidebar highlight — lightweight: just toggle class, no forced scroll on hover */
-  function hlSidebar(name, on) {
-    var cards = el.countryList.querySelectorAll('.country-card');
-    for (var i = 0; i < cards.length; i++) {
-      if (cards[i].dataset.name === name) {
-        cards[i].classList.toggle('highlighted', on);
-        break;
-      }
-    }
-  }
-
-  /* ── Search ────────────────────────────────────────────── */
-  function wireSearch() {
-    el.search.addEventListener('input', function () {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(function () {
-        var v = el.search.value.trim().toLowerCase();
-        if (v.length < 1) { el.searchDrop.classList.add('hidden'); clearHL(); return; }
-        doSearch(v);
-      }, 120);
-    });
-    el.search.addEventListener('focus', function () {
-      var v = el.search.value.trim().toLowerCase();
-      if (v.length >= 1) doSearch(v);
-    });
-    document.addEventListener('click', function (e) {
-      if (!e.target.closest('.search-box')) el.searchDrop.classList.add('hidden');
-    });
-    el.search.addEventListener('keydown', function (e) {
-      var items = el.searchDrop.querySelectorAll('.sr-item');
-      var cur = el.searchDrop.querySelector('.sr-item.active');
-      var idx = cur ? Array.from(items).indexOf(cur) : -1;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        if (idx < items.length - 1) {
-          items.forEach(function (i) { i.classList.remove('active'); });
-          items[idx + 1].classList.add('active');
-          items[idx + 1].scrollIntoView({ block: 'nearest' });
-        }
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (idx > 0) {
-          items.forEach(function (i) { i.classList.remove('active'); });
-          items[idx - 1].classList.add('active');
-          items[idx - 1].scrollIntoView({ block: 'nearest' });
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (cur) cur.click(); else if (items[0]) items[0].click();
-      } else if (e.key === 'Escape') {
-        el.searchDrop.classList.add('hidden');
-        el.search.blur();
-      }
-    });
-  }
-
-  function doSearch(query) {
-    var matches = countryList.filter(function (c) {
-      return c.name.toLowerCase().includes(query);
-    }).slice(0, 12);
-    var dd = el.searchDrop;
-    dd.innerHTML = '';
-
-    if (!matches.length) {
-      dd.innerHTML = '<div class="no-results"><p>No matches</p></div>';
-      dd.classList.remove('hidden');
-      clearHL();
-      return;
-    }
-    var frag = document.createDocumentFragment();
-    matches.forEach(function (c, i) {
-      var item = document.createElement('div');
-      item.className = 'sr-item' + (i === 0 ? ' active' : '');
-
-      var img = document.createElement('img');
-      img.className = 'sr-flag';
-      img.src = getFlagPath(c.flag);
-      img.alt = c.name;
-
-      var name = document.createElement('span');
-      name.className = 'sr-name';
-      name.textContent = c.name;
-
-      var cont = document.createElement('span');
-      cont.className = 'sr-cont';
-      cont.textContent = CONTINENTS[c.continent] ? CONTINENTS[c.continent].name : '';
-
-      item.appendChild(img);
-      item.appendChild(name);
-      item.appendChild(cont);
-      item.addEventListener('click', function () {
-        el.search.value = c.name;
-        dd.classList.add('hidden');
-        navigateToCountry(c);
-      });
-      item.addEventListener('mouseenter', function () {
-        dd.querySelectorAll('.sr-item').forEach(function (i) { i.classList.remove('active'); });
-        item.classList.add('active');
-      });
-      frag.appendChild(item);
-    });
-    dd.appendChild(frag);
-    dd.classList.remove('hidden');
-    hlMap(matches);
-  }
-
-  function hlMap(matches) {
-    clearHL();
-    var names = new Set();
-    matches.forEach(function (m) { names.add(m.name); if (m.topoName) names.add(m.topoName); });
-    mapG.selectAll('.land').each(function (d) {
-      var n = d.properties.name;
-      var cd = d.properties._cd;
-      if (names.has(n) || (cd && names.has(cd.display))) {
-        d3.select(this).classed('search-hl', true);
-      }
-    });
-    mapG.select('.borders').raise();
-    mapG.select('.sphere-ring').raise();
-    if (hlOverlay) hlOverlay.raise();
-  }
-
-  function clearHL() {
-    mapG.selectAll('.land').classed('search-hl', false);
-    if (activeNode) d3.select(activeNode).classed('active', true);
-  }
-
-  /* ── Flag Detail Panel ─────────────────────────────────── */
-  function wirePanel() {
-    el.panelClose.addEventListener('click', closePanel);
-    el.panelBg.addEventListener('click', closePanel);
-  }
-
-  function openPanel(name, flag, continent) {
-    el.panelImg.src = getFlagPath(flag);
-    el.panelImg.alt = name + ' Flag';
-    el.panelName.textContent = name;
-    var ci = CONTINENTS[continent];
-    el.panelBadge.textContent = ci ? ci.emoji + '  ' + ci.name : continent;
-    renderNeighbors(name, continent);
     el.panel.classList.remove('hidden');
   }
 
-  function closePanel() {
+  function closeFlagPanel() {
     el.panel.classList.add('hidden');
-    if (activeNode) {
-      d3.select(activeNode).classed('active', false);
+    activeCountry = null;
+    if (previousPolygon) {
+      previousPolygon.set("active", false);
+      previousPolygon.set("fill", am5.color(0xd9d9d9));
+      previousPolygon = undefined;
     }
-    activeNode = null;
+    var items = el.countryList.querySelectorAll('.country-item');
+    items.forEach(function (item) { item.classList.remove('active'); });
   }
 
-  function renderNeighbors(current, continent) {
-    var box = el.neighbors;
-    box.innerHTML = '';
-    var nb = countryList.filter(function (c) {
-      return c.continent === continent && c.name !== current;
-    }).slice(0, 9);
-    if (!nb.length) { el.neighborsWrap.style.display = 'none'; return; }
-    el.neighborsWrap.style.display = '';
-    nb.forEach(function (c) {
-      var card = document.createElement('div');
-      card.className = 'neighbor-card';
-      var img = document.createElement('img');
-      img.src = getFlagPath(c.flag);
-      img.alt = c.name;
-      img.loading = 'lazy';
-      var span = document.createElement('span');
-      span.textContent = c.name;
-      card.appendChild(img);
-      card.appendChild(span);
-      card.addEventListener('click', function () { navigateToCountry(c); });
-      box.appendChild(card);
-    });
-  }
-
-  /* ── Sidebar Toggle ────────────────────────────────────── */
-  function wireSidebar() {
-    el.sideToggle.addEventListener('click', function () {
-      el.sidebar.classList.add('collapsed');
-      el.sideReopen.classList.remove('hidden');
-    });
-    el.sideReopen.addEventListener('click', function () {
-      el.sidebar.classList.remove('collapsed');
-      el.sideReopen.classList.add('hidden');
-    });
-  }
-
-  /* ── Zoom Controls ─────────────────────────────────────── */
-  function wireZoom() {
-    el.zoomIn.addEventListener('click', function () {
-      svg.transition().duration(350).ease(d3.easeCubicOut).call(zoomB.scaleBy, 1.4);
-    });
-    el.zoomOut.addEventListener('click', function () {
-      svg.transition().duration(350).ease(d3.easeCubicOut).call(zoomB.scaleBy, 1 / 1.4);
-    });
-    el.zoomSlider.addEventListener('input', function () {
-      var k = parseFloat(el.zoomSlider.value);
-      svg.transition().duration(250).ease(d3.easeCubicOut).call(zoomB.scaleTo, k);
-    });
-    el.reset.addEventListener('click', resetView);
-  }
-
-  function resetView() {
-    activeContinent = 'world';
-    qa('.continent-chip').forEach(function (b) { b.classList.remove('active'); });
-    qa('.continent-chip')[0].classList.add('active');
-    activeLetter = 'all';
-    qa('.alpha-btn').forEach(function (b) { b.classList.remove('active'); });
-    el.alphaBar.querySelector('[data-letter="all"]').classList.add('active');
-    applyView('world');
-    smoothFlyTo(d3.zoomIdentity, 800);
-    renderList();
-    closePanel();
-    clearHL();
-    el.search.value = '';
-  }
-
-  /* ── Keyboard Shortcuts ────────────────────────────────── */
-  function wireKeys() {
-    document.addEventListener('keydown', function (e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); el.search.focus(); }
-      if (e.key === 'Escape') {
-        if (!el.panel.classList.contains('hidden')) closePanel();
-        el.searchDrop.classList.add('hidden');
+  function highlightSidebarItem(name) {
+    var items = el.countryList.querySelectorAll('.country-item');
+    items.forEach(function (item) {
+      if (item.dataset.name === name) {
+        item.classList.add('active');
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        item.classList.remove('active');
       }
     });
   }
 
-  /* ── Start ─────────────────────────────────────────────── */
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
+  // ── Sidebar ──
+  function renderSidebar() {
+    var filtered = fullList;
+    if (activeContinent !== 'all') {
+      if (activeContinent === 'northamerica') {
+        filtered = fullList.filter(function (c) {
+          return c.continent === 'northamerica' || c.continent === 'southamerica';
+        });
+      } else {
+        filtered = fullList.filter(function (c) { return c.continent === activeContinent; });
+      }
+    }
+
+    el.sidebarCount.textContent = filtered.length;
+    el.countryList.innerHTML = '';
+
+    filtered.forEach(function (c) {
+      var div = document.createElement('div');
+      div.className = 'country-item';
+      div.dataset.name = c.name;
+      div.innerHTML = '<img src="' + encodeURI(getFlagPath(c.flag)) + '" alt="' + escapeHtml(c.name) + '" loading="lazy">' +
+                      '<span class="country-name">' + escapeHtml(c.name) + '</span>';
+      div.addEventListener('click', function () {
+        rotateToCountryByName(c.name, c.topoName);
+      });
+      el.countryList.appendChild(div);
+    });
+  }
+
+  // ── Search ──
+  var searchTimer = null;
+
+  function handleSearch() {
+    var q = el.search.value.trim().toLowerCase();
+    if (q.length < 1) {
+      el.searchDrop.classList.add('hidden');
+      el.searchDrop.innerHTML = '';
+      return;
+    }
+
+    var matches = fullList.filter(function (c) {
+      return c.name.toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 12);
+
+    if (matches.length === 0) {
+      el.searchDrop.classList.add('hidden');
+      el.searchDrop.innerHTML = '';
+      return;
+    }
+
+    el.searchDrop.innerHTML = '';
+    matches.forEach(function (c) {
+      var div = document.createElement('div');
+      div.className = 'search-item';
+      div.innerHTML = '<img src="' + encodeURI(getFlagPath(c.flag)) + '" alt="' + escapeHtml(c.name) + '">' +
+                      '<span>' + escapeHtml(c.name) + '</span>';
+      div.addEventListener('click', function () {
+        el.search.value = '';
+        el.searchDrop.classList.add('hidden');
+        rotateToCountryByName(c.name);
+      });
+      el.searchDrop.appendChild(div);
+    });
+    el.searchDrop.classList.remove('hidden');
+  }
+
+  // ── Event Bindings ──
+  function bindEvents() {
+    el.search.addEventListener('input', function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(handleSearch, 150);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#search-box')) {
+        el.searchDrop.classList.add('hidden');
+      }
+    });
+
+    el.contFilter.addEventListener('click', function (e) {
+      var btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      el.contFilter.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeContinent = btn.dataset.continent;
+      renderSidebar();
+
+      // Rotate globe to the selected continent and highlight its countries
+      if (activeContinent !== 'all') {
+        rotateToContinentCenter(activeContinent);
+        highlightContinentOnMap(activeContinent);
+      } else {
+        clearContinentHighlight();
+      }
+    });
+
+    el.panelClose.addEventListener('click', closeFlagPanel);
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (!el.panel.classList.contains('hidden')) {
+          closeFlagPanel();
+        } else if (!el.searchDrop.classList.contains('hidden')) {
+          el.searchDrop.classList.add('hidden');
+          el.search.value = '';
+        }
+      }
+    });
+  }
+
+  // ── Utility ──
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ── Start ──
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 
 })();

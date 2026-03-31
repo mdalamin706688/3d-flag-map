@@ -3,215 +3,91 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Flag — Interactive World Map Explorer</title>
+  <title>3D Flag — Rotating Globe Explorer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+
+  <!-- amCharts 5 -->
+  <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/map.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/geodata/worldLow.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
 </head>
 <body>
 
-  <!-- ═══════ CINEMATIC LOADER ═══════ -->
-  <div id="loader" class="loader">
-    <div class="loader-bg-anim"></div>
-    <div class="loader-content">
-      <div class="loader-ring">
-        <svg viewBox="0 0 120 120">
-          <circle class="ring-bg" cx="60" cy="60" r="52"/>
-          <circle class="ring-progress" cx="60" cy="60" r="52"/>
-        </svg>
-        <div class="loader-globe-emoji">🌍</div>
-      </div>
-      <h2 class="loader-title">3D Flag Explorer</h2>
-      <p class="loader-sub">Loading world map data...</p>
-      <div class="loader-bar">
-        <div class="loader-bar-fill"></div>
-      </div>
-    </div>
-  </div>
+  <!-- App -->
+  <div id="app" class="app">
 
-  <!-- ═══════ APP SHELL ═══════ -->
-  <div id="app" class="app hidden">
-
-    <!-- ── Header ── -->
+    <!-- Header -->
     <header class="header">
       <div class="header-left">
         <div class="logo">
-          <div class="logo-mark">
-            <svg viewBox="0 0 36 36" fill="none">
-              <circle cx="18" cy="18" r="16" stroke="url(#logoGrad)" stroke-width="2"/>
-              <ellipse cx="18" cy="18" rx="6" ry="16" stroke="url(#logoGrad)" stroke-width="1.2"/>
-              <line x1="2" y1="12" x2="34" y2="12" stroke="url(#logoGrad)" stroke-width="0.7" opacity="0.6"/>
-              <line x1="2" y1="24" x2="34" y2="24" stroke="url(#logoGrad)" stroke-width="0.7" opacity="0.6"/>
-              <line x1="2" y1="18" x2="34" y2="18" stroke="url(#logoGrad)" stroke-width="0.7" opacity="0.4"/>
-              <defs>
-                <linearGradient id="logoGrad" x1="0" y1="0" x2="36" y2="36">
-                  <stop offset="0%" stop-color="#04d98b"/>
-                  <stop offset="100%" stop-color="#026440"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div class="logo-text">
-            <span class="logo-name">3D Flag</span>
-            <span class="logo-subtitle">World Map Explorer</span>
-          </div>
+          <span class="logo-icon">🌍</span>
+          <span class="logo-name">3D Flag Explorer</span>
         </div>
       </div>
-
       <div class="header-center">
         <div class="search-box" id="search-box">
           <svg class="search-icon" viewBox="0 0 20 20" fill="none">
             <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/>
             <path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          <input type="text" id="search-input" class="search-input" placeholder="Search countries & territories..." autocomplete="off" spellcheck="false">
-          <kbd class="search-kbd">⌘K</kbd>
+          <input type="text" id="search-input" class="search-input" placeholder="Search countries..." autocomplete="off" spellcheck="false">
           <div id="search-results" class="search-dropdown hidden"></div>
         </div>
       </div>
-
       <div class="header-right">
         <div class="stat-pill">
           <span class="stat-num" id="country-count-num">0</span>
-          <span class="stat-label">Flags</span>
+          <span class="stat-label">Countries</span>
         </div>
-        <div class="header-divider"></div>
-        <button id="reset-btn" class="icon-btn" title="Reset Map View">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M3.5 10a6.5 6.5 0 1 1 1.3 3.9" stroke-linecap="round"/>
-            <path d="M3.5 14.5V10h4.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
       </div>
     </header>
 
-    <!-- ── Continent Navigation ── -->
-    <nav class="continent-nav" id="continent-nav">
-      <div class="continent-track" id="continent-track">
-        <button class="continent-chip active" data-continent="world">
-          <span class="chip-dot"></span><span>World</span>
-        </button>
-        <button class="continent-chip" data-continent="africa">
-          <span class="chip-dot"></span><span>Africa</span>
-        </button>
-        <button class="continent-chip" data-continent="asia">
-          <span class="chip-dot"></span><span>Asia</span>
-        </button>
-        <button class="continent-chip" data-continent="oceania">
-          <span class="chip-dot"></span><span>Australia & Oceania</span>
-        </button>
-        <button class="continent-chip" data-continent="europe">
-          <span class="chip-dot"></span><span>Europe</span>
-        </button>
-        <button class="continent-chip" data-continent="northamerica">
-          <span class="chip-dot"></span><span>N. & C. America</span>
-        </button>
-        <button class="continent-chip" data-continent="southamerica">
-          <span class="chip-dot"></span><span>South America</span>
-        </button>
-      </div>
-    </nav>
-
-    <!-- ── Main Layout ── -->
+    <!-- Main Layout -->
     <main class="main">
 
-      <!-- Sidebar -->
+      <!-- Sidebar Country List -->
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-head">
           <h3>Countries</h3>
-          <div class="sidebar-head-right">
-            <span class="sidebar-count" id="sidebar-count">0</span>
-            <button id="sidebar-toggle" class="icon-btn-sm" title="Collapse">
-              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M13 16l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-          </div>
+          <span class="sidebar-count" id="sidebar-count">0</span>
         </div>
-
-        <!-- Alphabet -->
-        <div class="alpha-bar" id="alphabet-filter">
-          <button class="alpha-btn active" data-letter="all">ALL</button>
+        <div class="continent-filter" id="continent-filter">
+          <button class="filter-btn active" data-continent="all">All</button>
+          <button class="filter-btn" data-continent="africa">Africa</button>
+          <button class="filter-btn" data-continent="asia">Asia</button>
+          <button class="filter-btn" data-continent="europe">Europe</button>
+          <button class="filter-btn" data-continent="northamerica">Americas</button>
+          <button class="filter-btn" data-continent="oceania">Oceania</button>
         </div>
-
-        <!-- List -->
         <div class="country-scroll" id="country-list"></div>
       </aside>
 
-      <!-- Sidebar Reopen (when collapsed) -->
-      <button id="sidebar-reopen" class="sidebar-reopen hidden" title="Show Countries">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M7 4l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-
-      <!-- Map -->
-      <div class="map-area">
-        <div id="map-container"></div>
-
-        <!-- Zoom HUD -->
-        <div class="zoom-hud">
-          <button id="zoom-in" class="zoom-btn" title="Zoom In">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="10" x2="16" y2="10"/>
-            </svg>
-          </button>
-          <div class="zoom-track">
-            <input type="range" id="zoom-slider" class="zoom-range" min="1" max="12" step="0.1" value="1">
-          </div>
-          <button id="zoom-out" class="zoom-btn" title="Zoom Out">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="4" y1="10" x2="16" y2="10"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Zoom Level -->
-        <div class="map-info" id="map-info">
-          <span id="map-zoom-level">1.0×</span>
-        </div>
-
-        <!-- Tooltip — opacity controlled by JS, no class toggling -->
-        <div id="map-tooltip" class="tooltip" style="opacity:0;display:flex">
-          <img id="tooltip-flag" class="tooltip-flag" src="" alt="">
-          <div class="tooltip-body">
-            <span id="tooltip-name" class="tooltip-name"></span>
-            <span id="tooltip-cont" class="tooltip-cont"></span>
-          </div>
-        </div>
+      <!-- Globe -->
+      <div class="globe-area">
+        <div id="chartdiv"></div>
       </div>
+
+      <!-- Flag Detail Panel (right side) -->
+      <aside id="flag-panel" class="flag-panel hidden">
+        <button id="flag-panel-close" class="panel-close" title="Close">✕</button>
+        <div class="panel-flag-frame">
+          <img id="flag-image" class="panel-flag-img" src="" alt="">
+        </div>
+        <h2 id="flag-country-name" class="panel-title"></h2>
+        <span class="panel-badge" id="flag-continent-badge"></span>
+        <div class="panel-section" id="flag-neighbors">
+          <h4 class="panel-section-title">More from this region</h4>
+          <div class="panel-grid" id="neighbor-flags"></div>
+        </div>
+      </aside>
+
     </main>
-
-    <!-- ═══ Flag Detail Panel ═══ -->
-    <div id="flag-panel" class="panel-overlay hidden">
-      <div class="panel-backdrop" id="flag-panel-backdrop"></div>
-      <div class="panel-sheet">
-        <button id="flag-panel-close" class="panel-close">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="15" y1="5" x2="5" y2="15"/><line x1="5" y1="5" x2="15" y2="15"/>
-          </svg>
-        </button>
-        <div class="panel-hero">
-          <div class="panel-flag-frame">
-            <img id="flag-image" class="panel-flag-img" src="" alt="">
-          </div>
-        </div>
-        <div class="panel-body">
-          <h2 id="flag-country-name" class="panel-title"></h2>
-          <span class="panel-badge" id="flag-continent-badge"></span>
-          <div class="panel-section" id="flag-neighbors">
-            <h4 class="panel-section-title">More from this region</h4>
-            <div class="panel-grid" id="neighbor-flags"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
   <script src="js/countries-data.js"></script>
   <script src="js/app.js"></script>
 </body>

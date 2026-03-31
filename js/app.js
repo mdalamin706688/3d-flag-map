@@ -26,6 +26,8 @@
   var fullList = [];
   var activeContinent = 'all';
   var activeCountry = null;
+  var continentHighlightActive = false;
+  var continentHighlightNames = {};
 
   // Continent center coordinates for globe rotation
   var CONTINENT_CENTERS = {
@@ -146,6 +148,10 @@
       var target = ev.target;
       if (!target.dataItem) return;
       var mapName = target.dataItem.dataContext.name;
+
+      // Set hover fill color
+      target.set("fill", am5.color(0x800000));
+
       var cd = COUNTRIES_DATA[mapName];
       if (cd) {
         var flagSrc = encodeURI(getFlagPath(cd.flag));
@@ -166,10 +172,24 @@
       customTooltipEl.style.transform = 'translateY(0)';
     });
 
-    polygonSeries.mapPolygons.template.events.on("pointerout", function() {
+    polygonSeries.mapPolygons.template.events.on("pointerout", function(ev) {
       tooltipVisible = false;
       customTooltipEl.style.opacity = '0';
       customTooltipEl.style.transform = 'translateY(6px)';
+
+      // Restore correct fill on mouseout
+      var target = ev.target;
+      if (target.dataItem) {
+        var mapName = target.dataItem.dataContext.name;
+        var isActive = target.get("active");
+        if (isActive) {
+          target.set("fill", am5.color(0x800000));
+        } else if (continentHighlightActive && continentHighlightNames[mapName]) {
+          target.set("fill", am5.color(0x800000));
+        } else {
+          target.set("fill", am5.color(0xd9d9d9));
+        }
+      }
     });
 
     polygonSeries.mapPolygons.template.events.on("globalpointermove", function(ev) {
@@ -181,9 +201,8 @@
       }
     });
 
-    polygonSeries.mapPolygons.template.states.create("hover", {
-      fill: am5.color(0x800000)
-    });
+    // Hover fill is handled manually in pointerover/pointerout events
+    // to avoid amCharts state reset overriding continent highlights
 
     polygonSeries.mapPolygons.template.states.create("active", {
       fill: am5.color(0x800000)
@@ -262,11 +281,12 @@
 
   // Highlight all countries in a continent on the map
   function highlightContinentOnMap(continentKey) {
-    var names = getContinentCountryNames(continentKey);
+    continentHighlightNames = getContinentCountryNames(continentKey);
+    continentHighlightActive = true;
     polygonSeries.mapPolygons.each(function (polygon) {
       if (polygon.dataItem) {
         var mapName = polygon.dataItem.dataContext.name;
-        if (names[mapName]) {
+        if (continentHighlightNames[mapName]) {
           polygon.set("fill", am5.color(0x800000));
         } else {
           polygon.set("fill", am5.color(0xd9d9d9));
@@ -277,6 +297,8 @@
 
   // Clear continent highlight — reset all to default
   function clearContinentHighlight() {
+    continentHighlightActive = false;
+    continentHighlightNames = {};
     polygonSeries.mapPolygons.each(function (polygon) {
       polygon.set("fill", am5.color(0xd9d9d9));
     });

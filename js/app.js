@@ -104,13 +104,13 @@
         chart.set("panY", "translateY");
         chart.animate({ key: "rotationY", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
         chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
-        backgroundSeries.mapPolygons.template.set("fillOpacity", 0);
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 1);
       } else {
         chart.set("projection", am5map.geoOrthographic());
         chart.set("panY", "rotateY");
         chart.animate({ key: "rotationY", to: -25, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
         chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
-        backgroundSeries.mapPolygons.template.set("fillOpacity", 0.1);
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 1);
       }
     });
 
@@ -130,7 +130,7 @@
       toggleKey: "active",
       interactive: true,
       cursorOverStyle: "pointer",
-      fill: am5.color(0xd9d9d9),
+      fill: am5.color(0x026440),
       stroke: am5.color(0xffffff),
       strokeWidth: 0.75,
       strokeOpacity: 1
@@ -157,15 +157,15 @@
         var flagSrc = encodeURI(getFlagPath(cd.flag));
         var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
         customTooltipEl.innerHTML =
-          '<div style="background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,0.22),0 4px 16px rgba(0,0,0,0.12);padding:20px 24px 16px;text-align:center;min-width:200px;border:1px solid rgba(0,0,0,0.06)">' +
-            '<img src="' + flagSrc + '" style="width:130px;height:auto;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.18);margin:0 auto 14px;display:block;border:2px solid rgba(0,0,0,0.08)" />' +
-            '<div style="font-size:18px;font-weight:800;color:#111;letter-spacing:-0.02em;margin-bottom:6px;font-family:Inter,system-ui,sans-serif">' + (cd.display || mapName) + '</div>' +
-            '<div style="font-size:12px;font-weight:600;color:#fff;background:linear-gradient(135deg,#800000,#a52a2a);display:inline-block;padding:4px 14px;border-radius:12px;letter-spacing:0.04em;text-transform:uppercase">' + contName + '</div>' +
+          '<div style="background:#fff;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.2);padding:10px 14px 8px;text-align:center;min-width:120px;border:1px solid rgba(0,0,0,0.06)">' +
+            '<img src="' + flagSrc + '" style="width:64px;height:auto;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.14);margin:0 auto 8px;display:block;border:1px solid rgba(0,0,0,0.08)" />' +
+            '<div style="font-size:13px;font-weight:700;color:#111;letter-spacing:-0.02em;margin-bottom:3px;font-family:Inter,system-ui,sans-serif">' + (cd.display || mapName) + '</div>' +
+            '<div style="font-size:10px;font-weight:600;color:#fff;background:linear-gradient(135deg,#800000,#a52a2a);display:inline-block;padding:2px 8px;border-radius:8px;letter-spacing:0.04em;text-transform:uppercase">' + contName + '</div>' +
           '</div>';
       } else {
         customTooltipEl.innerHTML =
-          '<div style="background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,0.18);padding:14px 20px;text-align:center">' +
-            '<div style="font-size:16px;font-weight:700;color:#111">' + mapName + '</div></div>';
+          '<div style="background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.16);padding:8px 14px;text-align:center">' +
+            '<div style="font-size:13px;font-weight:700;color:#111">' + mapName + '</div></div>';
       }
       tooltipVisible = true;
       customTooltipEl.style.opacity = '1';
@@ -187,17 +187,15 @@
         } else if (continentHighlightActive && continentHighlightNames[mapName]) {
           target.set("fill", am5.color(0x800000));
         } else {
-          target.set("fill", am5.color(0xd9d9d9));
+          target.set("fill", am5.color(0x026440));
         }
       }
     });
 
-    polygonSeries.mapPolygons.template.events.on("globalpointermove", function(ev) {
+    document.addEventListener('mousemove', function(e) {
       if (tooltipVisible) {
-        var x = ev.point.x;
-        var y = ev.point.y;
-        customTooltipEl.style.left = (x + 16) + 'px';
-        customTooltipEl.style.top = (y - 20) + 'px';
+        customTooltipEl.style.left = (e.clientX + 14) + 'px';
+        customTooltipEl.style.top = (e.clientY - 14) + 'px';
       }
     });
 
@@ -208,13 +206,13 @@
       fill: am5.color(0x800000)
     });
 
-    // Background fill (ocean)
-    backgroundSeries = chart.series.push(
+    // Background fill (ocean) — inserted BEFORE country polygons so countries render on top
+    backgroundSeries = chart.series.unshift(
       am5map.MapPolygonSeries.new(root, {})
     );
     backgroundSeries.mapPolygons.template.setAll({
-      fill: root.interfaceColors.get("alternativeBackground"),
-      fillOpacity: 0.1,
+      fill: am5.color(0x87CEEB),
+      fillOpacity: 1,
       strokeOpacity: 0
     });
     backgroundSeries.data.push({
@@ -233,7 +231,7 @@
     polygonSeries.mapPolygons.template.on("active", function (active, target) {
       if (previousPolygon && previousPolygon !== target) {
         previousPolygon.set("active", false);
-        previousPolygon.set("fill", am5.color(0xd9d9d9));
+        previousPolygon.set("fill", am5.color(0x026440));
       }
       if (target.get("active")) {
         // Clear continent highlighting so selected country stands out
@@ -250,7 +248,7 @@
         showFlagPanel(mapName);
         highlightSidebarItem(displayName);
       } else {
-        target.set("fill", am5.color(0xd9d9d9));
+        target.set("fill", am5.color(0x026440));
       }
       previousPolygon = target;
     });
@@ -289,7 +287,7 @@
         if (continentHighlightNames[mapName]) {
           polygon.set("fill", am5.color(0x800000));
         } else {
-          polygon.set("fill", am5.color(0xd9d9d9));
+          polygon.set("fill", am5.color(0x026440));
         }
       }
     });
@@ -300,7 +298,7 @@
     continentHighlightActive = false;
     continentHighlightNames = {};
     polygonSeries.mapPolygons.each(function (polygon) {
-      polygon.set("fill", am5.color(0xd9d9d9));
+      polygon.set("fill", am5.color(0x026440));
     });
   }
 
@@ -436,7 +434,7 @@
     activeCountry = null;
     if (previousPolygon) {
       previousPolygon.set("active", false);
-      previousPolygon.set("fill", am5.color(0xd9d9d9));
+      previousPolygon.set("fill", am5.color(0x026440));
       previousPolygon = undefined;
     }
     var items = el.countryList.querySelectorAll('.country-item');

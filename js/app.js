@@ -104,13 +104,13 @@
         chart.set("panY", "translateY");
         chart.animate({ key: "rotationY", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
         chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
-        backgroundSeries.mapPolygons.template.set("fillOpacity", 1);
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 0);
       } else {
         chart.set("projection", am5map.geoOrthographic());
         chart.set("panY", "rotateY");
         chart.animate({ key: "rotationY", to: -25, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
         chart.animate({ key: "rotationX", to: 0, duration: 1500, easing: am5.ease.inOut(am5.ease.cubic) });
-        backgroundSeries.mapPolygons.template.set("fillOpacity", 1);
+        backgroundSeries.mapPolygons.template.set("fillOpacity", 0.1);
       }
     });
 
@@ -206,13 +206,13 @@
       fill: am5.color(0x800000)
     });
 
-    // Background fill (ocean) — inserted BEFORE country polygons so countries render on top
-    backgroundSeries = chart.series.unshift(
+    // Background fill (ocean)
+    backgroundSeries = chart.series.push(
       am5map.MapPolygonSeries.new(root, {})
     );
     backgroundSeries.mapPolygons.template.setAll({
-      fill: am5.color(0x87CEEB),
-      fillOpacity: 1,
+      fill: root.interfaceColors.get("alternativeBackground"),
+      fillOpacity: 0.1,
       strokeOpacity: 0
     });
     backgroundSeries.data.push({

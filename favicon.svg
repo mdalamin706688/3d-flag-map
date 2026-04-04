@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Flag globe icon">
+  <defs>
+    <linearGradient id="globeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#026440"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="12" fill="#0d1117"/>
+  <circle cx="32" cy="32" r="20" fill="url(#globeGrad)"/>
+  <path d="M20 38c4-3 8-4 12-4s8 1 12 4" fill="none" stroke="#e4ebff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M32 16v32" fill="none" stroke="#e4ebff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M28 22c2.5 3.5 7.5 3.5 10 0" fill="none" stroke="#e4ebff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M42 20l10-4v12L42 24" fill="#ffb657" stroke="#fff" stroke-width="1"/>
+  <path d="M42 20v16" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="18.5" fill="none" stroke="#eff3ff" stroke-opacity="0.3" stroke-width="1"/>
+</svg>

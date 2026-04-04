@@ -157,15 +157,15 @@
         var flagSrc = encodeURI(getFlagPath(cd.flag));
         var contName = CONTINENTS[cd.continent] ? CONTINENTS[cd.continent].name : cd.continent;
         customTooltipEl.innerHTML =
-          '<div style="background:#fff;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.2);padding:10px 14px 8px;text-align:center;min-width:120px;border:1px solid rgba(0,0,0,0.06)">' +
-            '<img src="' + flagSrc + '" style="width:64px;height:auto;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.14);margin:0 auto 8px;display:block;border:1px solid rgba(0,0,0,0.08)" />' +
-            '<div style="font-size:13px;font-weight:700;color:#111;letter-spacing:-0.02em;margin-bottom:3px;font-family:Inter,system-ui,sans-serif">' + (cd.display || mapName) + '</div>' +
-            '<div style="font-size:10px;font-weight:600;color:#fff;background:linear-gradient(135deg,#800000,#a52a2a);display:inline-block;padding:2px 8px;border-radius:8px;letter-spacing:0.04em;text-transform:uppercase">' + contName + '</div>' +
+          '<div style="background:#fff;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.18);padding:6px 10px 6px;text-align:center;min-width:80px;border:1px solid rgba(0,0,0,0.06)">' +
+            '<img src="' + flagSrc + '" style="width:36px;height:auto;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,0.12);margin:0 auto 5px;display:block;border:1px solid rgba(0,0,0,0.08)" />' +
+            '<div style="font-size:11px;font-weight:700;color:#111;letter-spacing:-0.02em;margin-bottom:2px;font-family:Inter,system-ui,sans-serif">' + (cd.display || mapName) + '</div>' +
+            '<div style="font-size:9px;font-weight:600;color:#fff;background:linear-gradient(135deg,#800000,#a52a2a);display:inline-block;padding:1px 6px;border-radius:6px;letter-spacing:0.04em;text-transform:uppercase">' + contName + '</div>' +
           '</div>';
       } else {
         customTooltipEl.innerHTML =
-          '<div style="background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.16);padding:8px 14px;text-align:center">' +
-            '<div style="font-size:13px;font-weight:700;color:#111">' + mapName + '</div></div>';
+          '<div style="background:#fff;border-radius:6px;box-shadow:0 3px 10px rgba(0,0,0,0.14);padding:5px 10px;text-align:center">' +
+            '<div style="font-size:11px;font-weight:700;color:#111">' + mapName + '</div></div>';
       }
       tooltipVisible = true;
       customTooltipEl.style.opacity = '1';
